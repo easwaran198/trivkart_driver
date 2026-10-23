@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/ride_model.dart';
 import '../../theme/app_theme.dart';
 
@@ -10,8 +11,14 @@ class TripCompletedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: Padding(
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
+        child: SafeArea(
+          child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -80,7 +87,7 @@ class TripCompletedScreen extends StatelessWidget {
                         children: [
                           const Text('Total Fare', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                           Text(
-                            '₹ ${ride.fare > 0 ? ride.fare.toStringAsFixed(0) : '850'}',
+                            '₹ ${ride.fare.toStringAsFixed(0)}',
                             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
                           ),
                         ],
@@ -110,6 +117,7 @@ class TripCompletedScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

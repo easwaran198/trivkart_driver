@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/driver_provider.dart';
 import '../../providers/ride_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -19,28 +20,50 @@ class _EarningsTabState extends State<EarningsTab> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<RideProvider>(context, listen: false).fetchEarnings();
+      Provider.of<DriverProvider>(context, listen: false).fetchDashboardDetails();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final rideProvider = Provider.of<RideProvider>(context);
+    final driverProvider = Provider.of<DriverProvider>(context);
     final earnings = rideProvider.earnings;
+    final dashboard = driverProvider.dashboardDetails;
 
-    double amount = earnings?.today.amount ?? 2450.0;
-    int rides = earnings?.today.rides ?? 8;
+    double amount = dashboard?.totalEarnings ?? earnings?.today.amount ?? 0.0;
+    int rides = dashboard?.totalTripCount ?? earnings?.today.rides ?? 0;
     if (_selectedPeriod == 'Month') {
-      amount = earnings?.month.amount ?? 18750.0;
-      rides = earnings?.month.rides ?? 42;
+      amount = earnings?.month.amount ?? (dashboard?.totalEarnings ?? 0.0);
+      rides = earnings?.month.rides ?? (dashboard?.totalTripCount ?? 0);
     } else if (_selectedPeriod == 'Total') {
-      amount = earnings?.total.amount ?? 145600.0;
-      rides = earnings?.total.rides ?? 312;
+      amount = dashboard?.totalEarnings ?? earnings?.total.amount ?? 0.0;
+      rides = dashboard?.totalTripCount ?? earnings?.total.rides ?? 0;
     }
+
+    final topPadding = MediaQuery.of(context).viewPadding.top;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Earnings'),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight + topPadding),
+        child: Container(
+          color: AppTheme.primaryBlue,
+          padding: EdgeInsets.only(top: topPadding),
+          child: const SizedBox(
+            height: kToolbarHeight,
+            child: Center(
+              child: Text(
+                'Earnings',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

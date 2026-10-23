@@ -45,19 +45,44 @@ class _BookingsTabState extends State<BookingsTab> with SingleTickerProviderStat
   }
 
   void _onStartRide(BuildContext context, RideModel ride) async {
-    final result = await showDialog<bool>(
+    if (!ride.isAdminApproved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Waiting for admin confirmation. Cannot start ride yet.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final result = await showDialog<dynamic>(
       context: context,
       builder: (context) => const OtpVerificationDialog(isStartTrip: true),
     );
 
-    if (result == true && context.mounted) {
+    if (result != null && context.mounted) {
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
-      final success = await rideProvider.startRide(ride.bookingId);
+      String? otp;
+      String? odometer;
+      String? imagePath;
+
+      if (result is StartTripResult) {
+        otp = result.otp;
+        odometer = result.odometerReading;
+        imagePath = result.imagePath;
+      }
+
+      final success = await rideProvider.startRide(
+        ride.bookingId,
+        otp: otp ?? '',
+        odometerValue: odometer ?? '',
+        odometerPhotoPath: imagePath ?? '',
+      );
       if (context.mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Ride Started successfully!'),
+              content: Text('Ride Started successfully with Odometer verification!'),
               backgroundColor: AppTheme.onlineGreen,
             ),
           );
@@ -81,7 +106,7 @@ class _BookingsTabState extends State<BookingsTab> with SingleTickerProviderStat
 
     if (reason != null && context.mounted) {
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
-      final success = await rideProvider.cancelBookingRide(ride.bookingId, reason);
+      final success = await rideProvider.cancelRide(ride.bookingId, reason);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -310,33 +335,60 @@ class _BookingsTabState extends State<BookingsTab> with SingleTickerProviderStat
                     // Action Buttons for Accepted List (status == 2)
                     if (status == 2) ...[
                       const Divider(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                minimumSize: const Size(0, 42),
-                                padding: EdgeInsets.zero,
+                      if (ride.isAdminApproved)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.onlineGreen,
+                                  minimumSize: const Size(0, 42),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                onPressed: () => _onStartRide(context, ride),
+                                child: const Text('Start Ride', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                               ),
-                              onPressed: () => _onStartRide(context, ride),
-                              child: const Text('Start Ride', style: TextStyle(fontSize: 14)),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(0, 42),
-                                padding: EdgeInsets.zero,
-                                foregroundColor: AppTheme.offlineRed,
-                                side: const BorderSide(color: AppTheme.offlineRed, width: 1.2),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(0, 42),
+                                  padding: EdgeInsets.zero,
+                                  foregroundColor: AppTheme.offlineRed,
+                                  side: const BorderSide(color: AppTheme.offlineRed, width: 1.2),
+                                ),
+                                onPressed: () => _onCancelRide(context, ride),
+                                child: const Text('Cancel Ride', style: TextStyle(fontSize: 14)),
                               ),
-                              onPressed: () => _onCancelRide(context, ride),
-                              child: const Text('Cancel Ride', style: TextStyle(fontSize: 14)),
                             ),
+                          ],
+                        )
+                      else
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.orange.shade200),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.hourglass_top_rounded, size: 16, color: Colors.orange.shade800),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Waiting for admin confirmation',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
 
                     // Action Buttons for New Requests (status == 1)
@@ -383,24 +435,47 @@ class _BookingsTabState extends State<BookingsTab> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final rideProvider = Provider.of<RideProvider>(context);
+    final topPadding = MediaQuery.of(context).viewPadding.top;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('My Bookings'),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabAlignment: TabAlignment.start,
-          tabs: const [
-            Tab(text: 'New Requests'),
-            Tab(text: 'Accepted'),
-            Tab(text: 'Completed'),
-            Tab(text: 'Cancelled'),
-          ],
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight + 48 + topPadding),
+        child: Container(
+          color: AppTheme.primaryBlue,
+          padding: EdgeInsets.only(top: topPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                height: kToolbarHeight,
+                child: Center(
+                  child: Text(
+                    'My Bookings',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                indicatorColor: Colors.white,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                tabAlignment: TabAlignment.start,
+                tabs: const [
+                  Tab(text: 'New Requests'),
+                  Tab(text: 'Accepted'),
+                  Tab(text: 'Completed'),
+                  Tab(text: 'Cancelled'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       body: rideProvider.isLoading

@@ -40,8 +40,11 @@ class RideModel {
   final double? dropLng;
   final CustomerModel customer;
   final String pickupOtp;
+  final String adminApproval;
   final String cancellationReason;
   final String createdAt;
+
+  bool get isAdminApproved => adminApproval.trim().toLowerCase() == 'approved';
 
   RideModel({
     required this.tripId,
@@ -65,6 +68,7 @@ class RideModel {
     this.dropLng,
     required this.customer,
     this.pickupOtp = '',
+    this.adminApproval = '',
     this.cancellationReason = '',
     required this.createdAt,
   });
@@ -107,6 +111,7 @@ class RideModel {
               mobile: json['customer_mobile'] ?? '',
             ),
       pickupOtp: json['pickup_otp'] ?? '',
+      adminApproval: json['admin_approval']?.toString() ?? '',
       cancellationReason: json['cancellation_reason'] ?? '',
       createdAt: json['created_at'] ?? '',
     );

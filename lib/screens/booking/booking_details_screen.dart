@@ -11,19 +11,34 @@ class BookingDetailsScreen extends StatelessWidget {
   const BookingDetailsScreen({super.key, required this.ride});
 
   void _onStartTrip(BuildContext context) async {
-    final result = await showDialog<bool>(
+    final result = await showDialog<dynamic>(
       context: context,
       builder: (context) => const OtpVerificationDialog(isStartTrip: true),
     );
 
-    if (result == true && context.mounted) {
+    if (result != null && context.mounted) {
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
-      final success = await rideProvider.startRide(ride.bookingId);
+      String? otp;
+      String? odometer;
+      String? imagePath;
+
+      if (result is StartTripResult) {
+        otp = result.otp;
+        odometer = result.odometerReading;
+        imagePath = result.imagePath;
+      }
+
+      final success = await rideProvider.startRide(
+        ride.bookingId,
+        otp: otp ?? '',
+        odometerValue: odometer ?? '',
+        odometerPhotoPath: imagePath ?? '',
+      );
       if (context.mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Trip Started successfully!'),
+              content: Text('Trip Started successfully with Odometer verification!'),
               backgroundColor: AppTheme.onlineGreen,
             ),
           );
@@ -48,13 +63,10 @@ class BookingDetailsScreen extends StatelessWidget {
 
     if (reason != null && context.mounted) {
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
-      final success = await rideProvider.cancelBookingRide(ride.bookingId, reason);
+      await rideProvider.cancelRide(ride.bookingId, reason);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? 'Booking cancelled: $reason' : 'Failed to cancel booking'),
-            backgroundColor: success ? AppTheme.onlineGreen : AppTheme.offlineRed,
-          ),
+          SnackBar(content: Text('Booking cancelled: $reason')),
         );
         Navigator.pop(context);
       }
@@ -63,10 +75,35 @@ class BookingDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).viewPadding.top;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Booking Details'),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight + topPadding),
+        child: Container(
+          color: AppTheme.primaryBlue,
+          padding: EdgeInsets.only(top: topPadding),
+          child: SizedBox(
+            height: kToolbarHeight,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Text(
+                  'Booking Details',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

@@ -44,13 +44,13 @@ class AuthProvider with ChangeNotifier {
         },
       );
 
-      if (response['success'] == true && response['data'] != null) {
+      if (response is Map && response['success'] == true && response['data'] != null) {
         final data = response['data'];
         final token = data['token'];
         final driverId = data['id'];
 
         if (token != null) {
-          await _storageService.saveToken(token);
+          await _storageService.saveToken(token.toString());
         }
         if (driverId != null) {
           await _storageService.saveDriverId(driverId.toString());
@@ -62,7 +62,7 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _errorMessage = response['message'] ?? 'Login failed';
+        _errorMessage = (response is Map ? response['message'] : null) ?? 'Login failed';
         _isLoading = false;
         debugPrint('❌ [LOGIN FAILED] Reason: $_errorMessage');
         notifyListeners();

@@ -18,5 +18,8 @@ class ApiConstants {
   static const String rideHistory = '$baseUrl/ride-history';
   static const String myBooking = '$baseUrl/my_booking';
   static const String earnings = '$baseUrl/earnings';
+  static const String dashboardDetails = '$baseUrl/dashboard-details';
   static const String notifications = '$baseUrl/notifications';
+  static const String viewProfile = '$baseUrl/view_profile';
+  static const String editProfile = '$baseUrl/edit_profile';
 }

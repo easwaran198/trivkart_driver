@@ -8,10 +8,35 @@ class VehicleInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).viewPadding.top;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Vehicle Information'),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight + topPadding),
+        child: Container(
+          color: AppTheme.primaryBlue,
+          padding: EdgeInsets.only(top: topPadding),
+          child: SizedBox(
+            height: kToolbarHeight,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Text(
+                  'Vehicle Information',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

@@ -5,7 +5,7 @@ import '../../providers/ride_provider.dart';
 import '../../theme/app_theme.dart';
 import '../home/driver_home_tab.dart';
 import '../booking/bookings_tab.dart';
-import '../earnings/earnings_tab.dart';
+import '../profile/profile_tab.dart';
 
 class DriverMainScreen extends StatefulWidget {
   const DriverMainScreen({super.key});
@@ -25,6 +25,8 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
 
       driverProvider.fetchUserInfo();
+      driverProvider.fetchProfile();
+      driverProvider.fetchDashboardDetails();
       driverProvider.fetchNotifications();
       rideProvider.fetchNewRequests();
       rideProvider.fetchActiveRide();
@@ -35,7 +37,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
   final List<Widget> _pages = const [
     DriverHomeTab(),
     BookingsTab(),
-    EarningsTab(),
+    ProfileTab(),
   ];
 
   @override
@@ -49,7 +51,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
@@ -81,9 +83,9 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
               label: 'Bookings',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              activeIcon: Icon(Icons.account_balance_wallet),
-              label: 'Earnings',
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ],
         ),

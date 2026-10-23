@@ -77,7 +77,7 @@ class _NewRequestDialogState extends State<NewRequestDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Bar: Title & Pickup Distance Badge (Responsive Layout)
+            // Top Bar: Title, Pickup Distance Badge & Close Button
             Row(
               children: [
                 const Expanded(
@@ -92,7 +92,7 @@ class _NewRequestDialogState extends State<NewRequestDialog> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -100,13 +100,23 @@ class _NewRequestDialogState extends State<NewRequestDialog> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Pickup • ${widget.ride.distanceKm} km',
+                    '${widget.ride.distanceKm} km',
                     style: const TextStyle(
                       color: AppTheme.primaryBlue,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  icon: const Icon(Icons.close, color: AppTheme.textMuted, size: 22),
+                  onPressed: () {
+                    _timer?.cancel();
+                    Navigator.pop(context);
+                  },
                 ),
               ],
             ),
@@ -208,15 +218,37 @@ class _NewRequestDialogState extends State<NewRequestDialog> {
             ),
             const SizedBox(height: 20),
 
-            // Action Buttons (Accept & Decline with Timer)
+            // Action Buttons (Accept, Decline with Timer & Close)
             ElevatedButton(
               onPressed: _accept,
               child: const Text('Accept'),
             ),
             const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: _decline,
-              child: Text('Decline ($_secondsLeft sec)'),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: OutlinedButton(
+                    onPressed: _decline,
+                    child: Text('Decline ($_secondsLeft s)'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.textMuted,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      _timer?.cancel();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

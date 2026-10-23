@@ -103,7 +103,7 @@ class RideProvider with ChangeNotifier {
     return false;
   }
 
-  Future<bool> cancelBookingRide(String bookingId, String reason) async {
+  Future<bool> cancelRide(String bookingId, String reason) async {
     _isLoading = true;
     notifyListeners();
 
@@ -112,18 +112,25 @@ class RideProvider with ChangeNotifier {
         ApiConstants.cancelRide,
         {
           'booking_id': bookingId,
-          'reason': reason.isNotEmpty ? reason : 'Cancelled by driver',
+          'reason': reason,
         },
       );
+
       if (response['success'] == true) {
         _newRequests.removeWhere((r) => r.bookingId == bookingId);
+        _newBookings.removeWhere((r) => r.bookingId == bookingId);
+        _acceptedBookings.removeWhere((r) => r.bookingId == bookingId);
+
+        // Refresh all relevant My Bookings tabs (1: New, 2: Accepted, 4: Cancelled)
         await fetchMyBookings(1);
         await fetchMyBookings(2);
-        await fetchMyBookings(3);
         await fetchMyBookings(4);
+
         _isLoading = false;
         notifyListeners();
         return true;
+      } else {
+        _error = response['message'] ?? 'Failed to cancel ride';
       }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -135,7 +142,7 @@ class RideProvider with ChangeNotifier {
   }
 
   Future<bool> declineRide(String bookingId) async {
-    return await cancelBookingRide(bookingId, 'Declined by driver');
+    return cancelRide(bookingId, 'Declined by driver');
   }
 
   Future<void> fetchActiveRide() async {
@@ -154,22 +161,42 @@ class RideProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> startRide(String bookingId) async {
+  Future<bool> startRide(
+    String bookingId, {
+    required String otp,
+    required String odometerValue,
+    required String odometerPhotoPath,
+    String status = 'start',
+  }) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final response = await _apiClient.post(
+      final fields = <String, String>{
+        'booking_id': bookingId,
+        'status': status,
+        'otp': otp,
+        'odometer_value': odometerValue,
+      };
+
+      final files = <String, String>{
+        'odometer_photo': odometerPhotoPath,
+      };
+
+      final response = await _apiClient.postMultipart(
         ApiConstants.startRide,
-        {'booking_id': bookingId},
+        fields,
+        files,
       );
-      if (response['success'] == true) {
+
+      if (response['success'] == true || response['status'] == true) {
         await fetchActiveRide();
-        await fetchMyBookings(1);
         await fetchMyBookings(2);
         _isLoading = false;
         notifyListeners();
         return true;
+      } else {
+        _error = response['message'] ?? 'Failed to start ride';
       }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -178,6 +205,57 @@ class RideProvider with ChangeNotifier {
       notifyListeners();
     }
     return false;
+  }
+
+  Future<Map<String, dynamic>?> stopRide(
+    String bookingId, {
+    String otp = '',
+    required String odometerValue,
+    required String odometerPhotoPath,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final fields = <String, String>{
+        'booking_id': bookingId,
+        'status': 'stop',
+        'odometer_value': odometerValue,
+      };
+
+      if (otp.isNotEmpty) {
+        fields['otp'] = otp;
+      }
+
+      final files = <String, String>{
+        'odometer_photo': odometerPhotoPath,
+      };
+
+      final response = await _apiClient.postMultipart(
+        ApiConstants.startRide,
+        fields,
+        files,
+      );
+
+      if (response['success'] == true || response['status'] == true) {
+        _activeRide = null;
+        await fetchActiveRide();
+        await fetchEarnings();
+        await fetchMyBookings(3);
+        await fetchMyBookings(2);
+        _isLoading = false;
+        notifyListeners();
+        return response;
+      } else {
+        _error = response['message'] ?? 'Failed to complete ride';
+      }
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return null;
   }
 
   Future<bool> completeRide(String bookingId, double fare) async {
@@ -195,10 +273,7 @@ class RideProvider with ChangeNotifier {
       if (response['success'] == true) {
         _activeRide = null;
         await fetchEarnings();
-        await fetchMyBookings(1);
-        await fetchMyBookings(2);
         await fetchMyBookings(3);
-        await fetchMyBookings(4);
         _isLoading = false;
         notifyListeners();
         return true;

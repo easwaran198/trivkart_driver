@@ -40,10 +40,35 @@ class _PaymentModeScreenState extends State<PaymentModeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).viewPadding.top;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Select Payment Mode'),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight + topPadding),
+        child: Container(
+          color: AppTheme.primaryBlue,
+          padding: EdgeInsets.only(top: topPadding),
+          child: SizedBox(
+            height: kToolbarHeight,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Text(
+                  'Select Payment Mode',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -63,7 +88,7 @@ class _PaymentModeScreenState extends State<PaymentModeScreen> {
                 children: [
                   const Text('Total Fare', style: TextStyle(fontSize: 16, color: AppTheme.textMuted)),
                   Text(
-                    '₹ ${widget.ride.fare > 0 ? widget.ride.fare.toStringAsFixed(0) : '850'}',
+                    '₹ ${widget.ride.fare.toStringAsFixed(0)}',
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
                   ),
                 ],

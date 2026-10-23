@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'storage_service.dart';
@@ -56,19 +57,75 @@ class ApiClient {
     }
   }
 
+  Future<dynamic> postMultipart(
+    String url,
+    Map<String, String> fields,
+    Map<String, String> filePaths,
+  ) async {
+    final token = await _storageService.getToken();
+    final uri = Uri.parse(url);
+    final request = http.MultipartRequest('POST', uri);
+
+    if (token != null && token.isNotEmpty) {
+      final rawToken = token.replaceFirst(RegExp(r'^Bearer\s+', caseSensitive: false), '');
+      final bearerToken = 'Bearer $rawToken';
+
+      request.headers['token'] = rawToken;
+      request.headers['Token'] = rawToken;
+      request.headers['Authorization'] = token.startsWith('Bearer ') ? token : bearerToken;
+    }
+    request.headers['Accept'] = 'application/json';
+
+    request.fields.addAll(fields);
+
+    for (final entry in filePaths.entries) {
+      if (entry.value.isNotEmpty && File(entry.value).existsSync()) {
+        request.files.add(
+          await http.MultipartFile.fromPath(entry.key, entry.value),
+        );
+      }
+    }
+
+    _logRequest('POST (MULTIPART)', url, request.headers, {
+      ...fields,
+      'files': filePaths,
+    });
+
+    try {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      _logResponse('POST (MULTIPART)', url, response.statusCode, response.body);
+      return _processResponse('POST (MULTIPART)', url, response);
+    } catch (e, stack) {
+      _logError('POST (MULTIPART)', url, e, stack);
+      rethrow;
+    }
+  }
+
   dynamic _processResponse(String method, String url, http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) return {};
+      if (response.body.isEmpty) return <String, dynamic>{};
+      
+      String body = response.body.trim();
+      if (body.startsWith('\uFEFF')) {
+        body = body.substring(1).trim();
+      }
+
       try {
-        return jsonDecode(response.body);
+        final decoded = jsonDecode(body);
+        return decoded;
       } catch (e) {
-        debugPrint('⚠️ [API PARSE WARNING] Unable to parse JSON response for $url');
-        return response.body;
+        debugPrint('⚠️ [API PARSE WARNING] Unable to parse JSON response for $url. Raw body: ${response.body}');
+        throw Exception('Invalid JSON response from server');
       }
     } else {
       String errorMessage = 'Server error (${response.statusCode})';
       try {
-        final decoded = jsonDecode(response.body);
+        String body = response.body.trim();
+        if (body.startsWith('\uFEFF')) {
+          body = body.substring(1).trim();
+        }
+        final decoded = jsonDecode(body);
         if (decoded is Map && decoded.containsKey('message')) {
           errorMessage = decoded['message'];
         }

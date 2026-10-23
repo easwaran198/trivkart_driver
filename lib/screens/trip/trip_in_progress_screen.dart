@@ -1,63 +1,125 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/ride_model.dart';
+import '../../providers/ride_provider.dart';
 import '../../theme/app_theme.dart';
 import 'otp_verification_dialog.dart';
-import 'payment_mode_screen.dart';
+import 'thanks_for_trip_screen.dart';
 
 class TripInProgressScreen extends StatelessWidget {
   final RideModel ride;
   const TripInProgressScreen({super.key, required this.ride});
 
   void _onDropCustomer(BuildContext context) async {
-    final otpVerified = await showDialog<bool>(
+    final result = await showDialog<dynamic>(
       context: context,
       builder: (context) => const OtpVerificationDialog(isStartTrip: false),
     );
 
-    if (otpVerified == true && context.mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentModeScreen(ride: ride),
-        ),
+    if (result != null && context.mounted) {
+      String? otp;
+      String? odometer;
+      String? imagePath;
+
+      if (result is StartTripResult) {
+        otp = result.otp;
+        odometer = result.odometerReading;
+        imagePath = result.imagePath;
+      }
+
+      final rideProvider = Provider.of<RideProvider>(context, listen: false);
+      final stopResult = await rideProvider.stopRide(
+        ride.bookingId,
+        otp: otp ?? '',
+        odometerValue: odometer ?? '',
+        odometerPhotoPath: imagePath ?? '',
       );
+
+      if (context.mounted) {
+        if (stopResult != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ThanksForTripScreen(
+                tripId: ride.bookingId.isNotEmpty ? ride.bookingId : ride.tripId,
+                fare: ride.fare,
+                billData: stopResult,
+                localStopImagePath: imagePath,
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(rideProvider.error ?? 'Failed to complete trip'),
+              backgroundColor: AppTheme.offlineRed,
+            ),
+          );
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final tripIdDisplay = ride.bookingId.isNotEmpty ? ride.bookingId : ride.tripId;
+    final hasCustomerName = ride.customer.name.trim().isNotEmpty;
+    final hasCustomerMobile = ride.customer.mobile.trim().isNotEmpty;
+    final topPadding = MediaQuery.of(context).viewPadding.top;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Trip In Progress'),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppTheme.onlineGreen,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Text(
-                'On Trip',
-                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight + topPadding),
+        child: Container(
+          color: AppTheme.primaryBlue,
+          padding: EdgeInsets.only(top: topPadding),
+          child: SizedBox(
+            height: kToolbarHeight,
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                const Text(
+                  'Trip In Progress',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.onlineGreen,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    ride.statusText.isNotEmpty ? ride.statusText : 'On Trip',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
       body: Column(
         children: [
-          // Customer Details Banner
+          // Customer Details Banner (Only live data)
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 22,
-                  backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
+                  backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
                   child: const Icon(Icons.person, color: AppTheme.primaryBlue),
                 ),
                 const SizedBox(width: 12),
@@ -66,94 +128,247 @@ class TripInProgressScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ride.customer.name.isNotEmpty ? ride.customer.name : 'John Doe',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        hasCustomerName ? ride.customer.name : 'Customer',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        ride.customer.mobile.isNotEmpty ? ride.customer.mobile : '+91 98765 43210',
-                        style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                      ),
+                      if (hasCustomerMobile)
+                        Text(
+                          ride.customer.mobile,
+                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        )
+                      else if (tripIdDisplay.isNotEmpty)
+                        Text(
+                          'Trip ID: #$tripIdDisplay',
+                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                        ),
                     ],
                   ),
                 ),
-                Container(
-                  decoration: const BoxDecoration(
-                    color: AppTheme.primaryBlue,
-                    shape: BoxShape.circle,
+                if (hasCustomerMobile)
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryBlue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.call, color: Colors.white, size: 20),
+                      onPressed: () {},
+                    ),
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.call, color: Colors.white),
-                    onPressed: () {},
-                  ),
-                ),
               ],
             ),
           ),
 
-          // Map Area Placeholder with polyline route design
+          // Main Live Navigation & Route View
           Expanded(
-            child: Container(
-              width: double.infinity,
-              color: Colors.blue.shade50,
-              child: Stack(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  // Map Graphic background simulation
-                  Center(
+                  // Live Trip Info Header Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.map, size: 80, color: AppTheme.primaryBlue.withOpacity(0.3)),
-                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'TX#$tripIdDisplay',
+                                style: const TextStyle(
+                                  color: AppTheme.primaryBlue,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            if (ride.tripType.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  ride.tripType.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
+                                    color: AppTheme.textDark,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (ride.pickupTime.isNotEmpty || ride.startDate.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time, size: 14, color: AppTheme.textMuted),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${ride.startDate} ${ride.pickupTime}'.trim(),
+                                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                              ),
+                              if (ride.fare > 0) ...[
+                                const Spacer(),
+                                Text(
+                                  '₹ ${ride.fare.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryBlue,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Route Pickup & Drop Card (Live Addresses)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         const Text(
-                          'Live Map Navigation View',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                          'Route Details',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Column(
+                              children: [
+                                const Icon(Icons.circle, color: AppTheme.onlineGreen, size: 12),
+                                Container(width: 2, height: 36, color: Colors.grey.shade300),
+                                const Icon(Icons.location_on, color: Colors.red, size: 16),
+                              ],
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Pickup Location',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    ride.pickupLocation.isNotEmpty ? ride.pickupLocation : 'Pickup location',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'Drop Location',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    ride.dropLocation.isNotEmpty ? ride.dropLocation : 'Drop location',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 14),
 
-                  // Route pickup & drop card floating over map
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    right: 16,
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.circle, color: AppTheme.onlineGreen, size: 12),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    ride.pickupLocation,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on, color: Colors.red, size: 14),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    ride.dropLocation,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                  // Live Status Banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.onlineGreen.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.onlineGreen.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.onlineGreen.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.navigation, color: AppTheme.onlineGreen, size: 20),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ride in progress',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: AppTheme.onlineGreen,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Proceed towards the destination location',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -161,7 +376,7 @@ class TripInProgressScreen extends StatelessWidget {
             ),
           ),
 
-          // Bottom Navigation Summary Card & Drop Customer Button
+          // Bottom Action Button
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -169,46 +384,35 @@ class TripInProgressScreen extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 10,
                   offset: const Offset(0, -3),
                 ),
               ],
             ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: SafeArea(
+              top: false,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.onlineGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => _onDropCustomer(context),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Column(
-                      children: [
-                        const Text('Distance Left', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${ride.distanceKm > 0 ? ride.distanceKm : 18} km',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Container(height: 30, width: 1, color: Colors.grey.shade300),
-                    const Column(
-                      children: [
-                        Text('Estimated Time', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                        SizedBox(height: 4),
-                        Text(
-                          '25 mins',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                    Icon(Icons.check_circle_outline, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Drop Customer / Complete Trip',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => _onDropCustomer(context),
-                  child: const Text('Drop Customer'),
-                ),
-              ],
+              ),
             ),
           ),
         ],
